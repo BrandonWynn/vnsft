@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny  # ✅ Import this for public endpoints
 from .serializers import PingSerializer
 import logging
 import json
@@ -11,15 +12,20 @@ class PingView(APIView):
     """
     GET /api/ping/  → returns {"message": "pong"}
     """
+    permission_classes = [AllowAny]  # ✅ Optional: make /ping/ open too
+
     def get(self, request):
         serializer = PingSerializer({"message": "pong"})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
 class CallbackView(APIView):
     """
-    GET /api/callback/  → Handles Manheim OAuth redirect (e.g., ?code=abc123 or ?error=access_denied)
+    GET /api/callback/  → Handles Manheim OAuth redirect (?code=abc123 or ?error=access_denied)
     POST /api/callback/ → Handles Manheim webhooks (e.g., JSON payload for auction updates)
     """
+    permission_classes = [AllowAny]  # ✅ Make this public — required for Manheim callbacks
+
     def dispatch(self, request, *args, **kwargs):
         return super().dispatch(request, *args, **kwargs)
 
