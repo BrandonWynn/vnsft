@@ -5,7 +5,8 @@ from rest_framework.permissions import AllowAny  # ✅ For public endpoints
 from .serializers import PingSerializer
 import logging
 import json
-import requests  # ✅ Added for the VIN decode API
+import requests
+from django.http import HttpResponse
 
 logger = logging.getLogger(__name__)
 
@@ -65,43 +66,46 @@ class CallbackView(APIView):
 
 
 class DecodeVinView(APIView):
-    """
-    POST /api/decode-vin/ → Takes a VIN, calls the NHTSA API, returns vehicle info.
-    """
-    permission_classes = [AllowAny]  # ✅ Public endpoint
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        html_form = """
+            <html>
+            <body>
+                <h2>VIN Decoder Test</h2>
+                <form method="post">
+                    <label for="vin">Enter VIN:</label>
+                    <input type="text" name="vin" id="vin" />
+                    <button type="submit">Decode</button>
+                </form>
+            </body>
+            </html>
+        """
+        return HttpResponse(html_form)
 
     def post(self, request):
-        vin = request.data.get('vin')
+        vin = request.data.get('vin') or request.POST.get('vin')  # ✅ Handles form POST too!
         if not vin:
-            logger.warning("No VIN provided")
-            return Response(
-                {"error": "VIN is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "VIN is required"}, status=400)
 
-        url = f'https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{vin}?format=json'
-        logger.info(f"Calling NHTSA API for VIN: {vin}")
+        url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{vin}?format=json"
+        response = requests.get(url)
+        data = response.json()
 
-        try:
-            response = requests.get(url, timeout=10)
-            data = response.json()
+        make = next((item['Value'] for item in data['Results'] if item['Variable'] == 'Make'), None)
+        model = next((item['Value'] for item in data['Results'] if item['Variable'] == 'Model'), None)
+        year = next((item['Value'] for item in data['Results'] if item['Variable'] == 'Model Year'), None)
 
-            make = next((item['Value'] for item in data['Results'] if item['Variable'] == 'Make'), None)
-            model = next((item['Value'] for item in data['Results'] if item['Variable'] == 'Model'), None)
-            year = next((item['Value'] for item in data['Results'] if item['Variable'] == 'Model Year'), None)
-
-            logger.info(f"Decoded VIN: Make={make}, Model={model}, Year={year}")
-
-            return Response({
-                'vin': vin,
-                'make': make,
-                'model': model,
-                'year': year
-            }, status=status.HTTP_200_OK)
-
-        except requests.RequestException as e:
-            logger.error(f"NHTSA API error: {e}")
-            return Response(
-                {"error": "Failed to call NHTSA API"},
-                status=status.HTTP_502_BAD_GATEWAY
-            )
+        html_result = f"""
+            <html>
+            <body>
+                <h2>VIN Decode Result</h2>
+                <p><strong>VIN:</strong> {vin}</p>
+                <p><strong>Make:</strong> {make}</p>
+                <p><strong>Model:</strong> {model}</p>
+                <p><strong>Year:</strong> {year}</p>
+                <a href="/decode-vin">Decode another VIN</a>
+            </body>
+            </html>
+        """
+        return HttpResponse(html_result)
