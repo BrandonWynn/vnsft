@@ -1,12 +1,14 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny  # ✅ Import this for public endpoints
+from rest_framework.permissions import AllowAny  # ✅ For public endpoints
 from .serializers import PingSerializer
 import logging
 import json
+import requests  # ✅ Added for the VIN decode API
 
 logger = logging.getLogger(__name__)
+
 
 class PingView(APIView):
     """
@@ -59,4 +61,47 @@ class CallbackView(APIView):
             return Response(
                 {"error": "Bad JSON, try again"},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class DecodeVinView(APIView):
+    """
+    POST /api/decode-vin/ → Takes a VIN, calls the NHTSA API, returns vehicle info.
+    """
+    permission_classes = [AllowAny]  # ✅ Public endpoint
+
+    def post(self, request):
+        vin = request.data.get('vin')
+        if not vin:
+            logger.warning("No VIN provided")
+            return Response(
+                {"error": "VIN is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        url = f'https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/{vin}?format=json'
+        logger.info(f"Calling NHTSA API for VIN: {vin}")
+
+        try:
+            response = requests.get(url, timeout=10)
+            data = response.json()
+
+            make = next((item['Value'] for item in data['Results'] if item['Variable'] == 'Make'), None)
+            model = next((item['Value'] for item in data['Results'] if item['Variable'] == 'Model'), None)
+            year = next((item['Value'] for item in data['Results'] if item['Variable'] == 'Model Year'), None)
+
+            logger.info(f"Decoded VIN: Make={make}, Model={model}, Year={year}")
+
+            return Response({
+                'vin': vin,
+                'make': make,
+                'model': model,
+                'year': year
+            }, status=status.HTTP_200_OK)
+
+        except requests.RequestException as e:
+            logger.error(f"NHTSA API error: {e}")
+            return Response(
+                {"error": "Failed to call NHTSA API"},
+                status=status.HTTP_502_BAD_GATEWAY
             )
