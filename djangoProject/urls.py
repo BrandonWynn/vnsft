@@ -24,6 +24,6 @@ def root_view(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('core.urls')),
+    path('', include('core.urls')),  # instead of 'api/'
     path('', root_view, name='root'),  # Root URL
 ]

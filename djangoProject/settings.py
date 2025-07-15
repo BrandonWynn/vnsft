@@ -22,6 +22,8 @@ environ.Env.read_env(env_file=os.path.join(BASE_DIR, '.env'))
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
 
+AUTH_USER_MODEL = 'core.User'
+
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
@@ -124,12 +126,13 @@ CSRF_TRUSTED_ORIGINS = [
 # ✅ 🔑 DRF auth for mobile token auth
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
 
 # ✅ 📋 Logging to console
 LOGGING = {
